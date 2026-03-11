@@ -1,6 +1,7 @@
 .env
 .venv/
 crypto_core/
+AGENTS.md
 __pycache__/
 *.pyc
 *.pyo
