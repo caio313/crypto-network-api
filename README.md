@@ -54,11 +54,13 @@ GET  /mcp                        MCP endpoint for AI agents (PRO)
 
 ## Pricing
 
-| Tier | Requests/mo | Networks | MCP Access | Price |
-|------|-------------|----------|------------|-------|
-| FREE | 10,000 | 4 networks | ❌ | $0 |
-| PRO | 500,000 | All 8 networks | ✅ | $49/mo |
-| ENTERPRISE | Unlimited | All + custom | ✅ Priority | $299/mo |
+| Tier | Requests | Networks | MCP Access | Price |
+|------|----------|----------|------------|-------|
+| FREE | 100/day | 4 networks | estimate_cost + get_alerts | $0 |
+| PRO | 2,000/day | All 8 networks | All tools | 30-day free trial, then $5/mo + $0.029/req |
+| ENTERPRISE | Unlimited | All + custom | All tools + priority | $159/mo |
+
+> PRO trial includes full access for 30 days — no credit card required.
 
 Get your API key → https://cryptonetworkapi.com/pricing
 

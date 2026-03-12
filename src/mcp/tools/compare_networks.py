@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 
+from src.models.response import AIFirstResponse
 from src.scoring.engine import ALLOWED_NETWORKS, calculate_network_score
 
 
@@ -32,7 +33,7 @@ class CompareNetworksOutput(BaseModel):
     comparison_table: list[NetworkComparisonItem]
 
 
-async def compare_networks(input_data: CompareNetworksInput) -> CompareNetworksOutput:
+async def compare_networks(input_data: CompareNetworksInput) -> AIFirstResponse:
     tier = input_data.tier.upper() if input_data.tier else "FREE"
 
     if tier == "FREE":
@@ -70,4 +71,35 @@ async def compare_networks(input_data: CompareNetworksInput) -> CompareNetworksO
 
     comparison.sort(key=lambda x: x.score, reverse=True)
 
-    return CompareNetworksOutput(comparison_table=comparison)
+    if not comparison:
+        return AIFirstResponse.create(
+            success=False,
+            data={"comparison": []},
+            reasoning="No networks could be compared. Please check network availability.",
+            confidence=0.0,
+            action="Retry with different networks.",
+            warnings=[],
+            alternatives=[],
+            data_freshness_seconds=0,
+        )
+
+    winner = comparison[0]
+
+    reasoning = f"{winner.network.upper()} scores {winner.score}/100, higher than all other networks compared. Safety level: {winner.safety_level}."
+
+    confidence = winner.score / 100.0
+
+    warnings = []
+
+    return AIFirstResponse.create(
+        success=True,
+        data={
+            "comparison": [c.model_dump() for c in comparison],
+        },
+        reasoning=reasoning,
+        confidence=confidence,
+        action=f"Use {winner.network.upper()} for this transaction.",
+        warnings=warnings,
+        alternatives=[],
+        data_freshness_seconds=0,
+    )

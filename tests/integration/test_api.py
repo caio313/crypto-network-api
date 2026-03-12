@@ -129,32 +129,45 @@ class TestAPIEndpoints:
         )
         assert response.status_code == 200
         data = response.json()
-        assert "alerts" in data
+        assert data.get("success") == True
+        assert "data" in data
+        assert "reasoning" in data
+        assert "action" in data
+        assert "warnings" in data
+        assert isinstance(data.get("warnings"), list)
+        assert isinstance(data.get("alternatives"), list)
 
     @pytest.mark.asyncio
     async def test_rate_limit_429_response(self, client):
-        import time
+        from datetime import datetime, timezone
 
         api_key = "sk-rate-limit-test-key-123456789"
         from src.api.middleware.auth import MOCK_API_KEYS
+        from src.cache.redis import redis_client
 
         MOCK_API_KEYS[api_key] = "free"
 
-        original_limit = 60
-        response = None
+        original_get = redis_client.client.get
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        async def mock_get(key):
+            if key == f"rate_limit:{api_key}:{today}":
+                return "150"
+            return await original_get(key)
 
         try:
-            for _ in range(original_limit + 5):
-                response = await client.get("/v1/gas", headers={"X-API-Key": api_key})
-                if response.status_code == 429:
-                    break
+            redis_client.client.get = mock_get
 
-            assert response is not None
+            response = await client.get("/v1/gas", headers={"X-API-Key": api_key})
+
             assert response.status_code == 429
-            assert "Retry-After" in response.headers or "X-RateLimit-Remaining" in response.headers
+            assert "Retry-After" in response.headers
+            assert response.headers.get("X-RateLimit-Limit") == "100"
+            assert response.headers.get("X-RateLimit-Remaining") == "0"
         finally:
             if api_key in MOCK_API_KEYS:
                 del MOCK_API_KEYS[api_key]
+            redis_client.client.get = original_get
 
     @pytest.mark.asyncio
     async def test_invalid_network_returns_400(self, client):

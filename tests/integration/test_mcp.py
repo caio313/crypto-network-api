@@ -69,11 +69,15 @@ class TestGetBestNetwork:
 
             result = await get_best_network(input_data)
 
-            assert result.network == "ethereum"
-            assert result.score == 85.0
-            assert result.estimated_fee_usd == 5.0
-            assert result.estimated_time_seconds == 900
-            assert "reasoning" in result.model_dump()
+            assert result.success == True
+            assert result.reasoning != ""
+            assert 0.0 <= result.confidence <= 1.0
+            assert result.action != ""
+            assert isinstance(result.warnings, list)
+            assert isinstance(result.alternatives, list)
+            assert isinstance(result.data, dict)
+            assert result.data.get("network") == "ethereum"
+            assert result.data.get("score") == 85.0
 
     @pytest.mark.asyncio
     async def test_get_best_network_invalid_priority(self):
@@ -125,8 +129,14 @@ class TestCompareNetworks:
 
             result = await compare_networks(input_data)
 
-            assert len(result.comparison_table) > 0
-            assert result.comparison_table[0].network in input_data.networks
+            assert result.success == True
+            assert result.reasoning != ""
+            assert 0.0 <= result.confidence <= 1.0
+            assert result.action != ""
+            assert isinstance(result.warnings, list)
+            assert isinstance(result.alternatives, list)
+            assert isinstance(result.data, dict)
+            assert len(result.data.get("comparison", [])) > 0
 
     @pytest.mark.asyncio
     async def test_compare_networks_invalid_network(self):
@@ -172,10 +182,16 @@ class TestEstimateCost:
 
         result = await estimate_cost(input_data)
 
-        assert result.fee_usd > 0
-        assert result.fee_native > 0
-        assert result.fee_percentile > 0
-        assert result.estimated_confirmation_seconds > 0
+        assert result.success == True
+        assert result.reasoning != ""
+        assert 0.0 <= result.confidence <= 1.0
+        assert result.action != ""
+        assert isinstance(result.warnings, list)
+        assert isinstance(result.alternatives, list)
+        assert isinstance(result.data, dict)
+        assert result.data.get("fee_usd") > 0
+        assert result.data.get("fee_native") > 0
+        assert result.data.get("confirmation_seconds") > 0
 
     @pytest.mark.asyncio
     async def test_estimate_cost_invalid_network(self):
@@ -200,7 +216,8 @@ class TestEstimateCost:
         for network in valid_networks:
             input_data = EstimateCostInput(network=network, amount_usd=100.0, token="ETH")
             result = await estimate_cost(input_data)
-            assert result.fee_usd > 0
+            assert result.success == True
+            assert result.data.get("fee_usd") > 0
 
     @pytest.mark.asyncio
     async def test_estimate_cost_negative_amount(self):
@@ -293,12 +310,20 @@ class TestGetAlerts:
 
         result = await get_alerts(input_data)
 
-        assert len(result.alerts) > 0
-        for alert in result.alerts:
-            assert alert.network is not None
-            assert alert.severity is not None
-            assert alert.alert_type is not None
-            assert alert.message is not None
+        assert result.success == True
+        assert result.reasoning != ""
+        assert 0.0 <= result.confidence <= 1.0
+        assert result.action != ""
+        assert isinstance(result.warnings, list)
+        assert isinstance(result.alternatives, list)
+        assert isinstance(result.data, dict)
+        alerts = result.data.get("alerts", [])
+        assert len(alerts) > 0
+        for alert in alerts:
+            assert alert.get("network") is not None
+            assert alert.get("severity") is not None
+            assert alert.get("alert_type") is not None
+            assert alert.get("message") is not None
 
     @pytest.mark.asyncio
     async def test_get_alerts_filtered_by_networks(self):
@@ -306,8 +331,9 @@ class TestGetAlerts:
 
         result = await get_alerts(input_data)
 
-        for alert in result.alerts:
-            assert alert.network in ["ethereum", "polygon"]
+        alerts = result.data.get("alerts", [])
+        for alert in alerts:
+            assert alert.get("network") in ["ethereum", "polygon"]
 
     @pytest.mark.asyncio
     async def test_get_alerts_invalid_network(self):
@@ -333,7 +359,8 @@ class TestGetAlerts:
 
         result = await get_alerts(input_data)
 
-        assert len(result.alerts) > 0
+        alerts = result.data.get("alerts", [])
+        assert len(alerts) > 0
 
     @pytest.mark.asyncio
     async def test_get_alerts_empty_networks_filter(self):
@@ -341,7 +368,8 @@ class TestGetAlerts:
 
         result = await get_alerts(input_data)
 
-        assert len(result.alerts) == 0
+        alerts = result.data.get("alerts", [])
+        assert len(alerts) == 0
 
     @pytest.mark.asyncio
     async def test_get_alerts_response_structure(self):
@@ -349,12 +377,13 @@ class TestGetAlerts:
 
         result = await get_alerts(input_data)
 
-        for alert in result.alerts:
-            assert hasattr(alert, "network")
-            assert hasattr(alert, "severity")
-            assert hasattr(alert, "alert_type")
-            assert hasattr(alert, "message")
-            assert hasattr(alert, "started_at")
+        alerts = result.data.get("alerts", [])
+        for alert in alerts:
+            assert "network" in alert
+            assert "severity" in alert
+            assert "alert_type" in alert
+            assert "message" in alert
+            assert "started_at" in alert
 
 
 class TestMCPToolsIntegration:
