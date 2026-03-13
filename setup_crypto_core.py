@@ -1,28 +1,19 @@
 import os
-import base64
+import shutil
 
-modules = {
-    "cost": os.environ.get("CRYPTO_CORE_COST"),
-    "safety": os.environ.get("CRYPTO_CORE_SAFETY"),
-    "reliability": os.environ.get("CRYPTO_CORE_RELIABILITY"),
-    "speed": os.environ.get("CRYPTO_CORE_SPEED"),
-    "weights": os.environ.get("CRYPTO_CORE_WEIGHTS"),
-    "normalizer": os.environ.get("CRYPTO_CORE_NORMALIZER"),
-}
+src = "crypto_core_dist"
+dst = "crypto_core"
 
-os.makedirs("crypto_core", exist_ok=True)
+if not os.path.exists(src):
+    print(f"ERROR: {src} directory not found")
+    exit(1)
 
-with open("crypto_core/__init__.py", "w") as f:
-    f.write("")
+os.makedirs(dst, exist_ok=True)
 
-for name, value in modules.items():
-    if value:
-        code = base64.b64decode(value).decode("utf-8")
-        with open(f"crypto_core/{name}.py", "w") as f:
-            f.write(code)
-        print(f"Written crypto_core/{name}.py")
-    else:
-        print(f"ERROR: CRYPTO_CORE_{name.upper()} not set")
-        exit(1)
+for filename in os.listdir(src):
+    src_path = os.path.join(src, filename)
+    if os.path.isfile(src_path):
+        shutil.copy2(src_path, os.path.join(dst, filename))
+        print(f"Copied {filename} to {dst}/")
 
 print("crypto_core setup complete")
