@@ -1,1 +1,1 @@
-from crypto_core.reliability import *
+from src.crypto_core.reliability import *

@@ -2,7 +2,7 @@ import os
 import shutil
 
 src = "crypto_core_dist"
-dst = "crypto_core"
+dst = "src/crypto_core"
 
 if not os.path.exists(src):
     print(f"ERROR: {src} directory not found")

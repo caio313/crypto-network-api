@@ -1,7 +1,7 @@
 .env
 .venv/
-crypto_core/
 AGENTS.md
+src/crypto_core/
 __pycache__/
 *.pyc
 *.pyo
@@ -11,4 +11,3 @@ dist/
 build/
 *.egg-info/
 .DS_Store
-
