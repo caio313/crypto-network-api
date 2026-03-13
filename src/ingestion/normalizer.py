@@ -1,1 +1,1 @@
-from src.crypto_core.normalizer import *
+from crypto_core.normalizer import *

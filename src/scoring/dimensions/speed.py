@@ -1,1 +1,1 @@
-from src.crypto_core.speed import *
+from crypto_core.speed import *

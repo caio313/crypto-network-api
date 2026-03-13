@@ -1,1 +1,1 @@
-from src.crypto_core.weights import *
+from crypto_core.weights import *

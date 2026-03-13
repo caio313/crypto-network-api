@@ -1,1 +1,1 @@
-from src.crypto_core.cost import *
+from crypto_core.cost import *
