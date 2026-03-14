@@ -19,6 +19,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "mcp>=1.1.0",
     "prometheus-client>=0.24.1",
+    "crypto-core",
 ]
 
 [project.optional-dependencies]
@@ -65,3 +66,6 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.uv.sources]
+crypto-core = { path = "./crypto_core", editable = true }
