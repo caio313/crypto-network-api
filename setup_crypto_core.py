@@ -17,8 +17,3 @@ for filename in os.listdir(src):
         print(f"Copied {filename} to {dst}/")
 
 print("crypto_core setup complete")
-
-import sys
-import os
-
-sys.path.insert(0, os.getcwd())
