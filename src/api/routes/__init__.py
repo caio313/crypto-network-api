@@ -1,3 +1,3 @@
-from src.api.routes import alerts, gas, networks, transactions
+from src.api.routes import alerts, auth, gas, networks, transactions
 
-__all__ = ["alerts", "gas", "networks", "transactions"]
+__all__ = ["alerts", "auth", "gas", "networks", "transactions"]
