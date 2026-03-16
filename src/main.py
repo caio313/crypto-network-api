@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from src.api.deps import get_redis_client
-from src.api.middleware.auth import get_api_key_tier
 from src.api.middleware.rate_limit import RateLimitMiddleware
 from src.api.middleware.auth import AuthMiddleware
 from src.api.routes import alerts, gas, networks, transactions
@@ -24,23 +23,31 @@ _beat_process: Any = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> Any:
+async def lifespan(app: FastAPI):
     global _beat_process
-    
+
     logger.info("application_starting", environment=settings.environment)
-    
+
     try:
         await redis_client.connect()
     except Exception as e:
         logger.warning("redis_connection_failed", error=str(e))
-    
+
     try:
         import subprocess
         import sys
-        
+
         beat_proc = subprocess.Popen(
-            [sys.executable, "-m", "celery", "-A", "src.ingestion.scheduler", "beat", 
-             "--loglevel=info", "--pidfile=/tmp/celerybeat.pid"],
+            [
+                sys.executable,
+                "-m",
+                "celery",
+                "-A",
+                "src.ingestion.scheduler",
+                "beat",
+                "--loglevel=info",
+                "--pidfile=/tmp/celerybeat.pid",
+            ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -48,12 +55,12 @@ async def lifespan(app: FastAPI) -> Any:
         logger.info("celery_beat_started", pid=beat_proc.pid)
     except Exception as e:
         logger.warning("celery_beat_start_failed", error=str(e))
-    
+
     yield
-    
+
     logger.info("application_shutting_down")
     await redis_client.disconnect()
-    
+
     if _beat_process:
         try:
             _beat_process.terminate()
@@ -101,7 +108,7 @@ async def health_check() -> dict[str, str]:
             await redis_client.client.ping()
     except Exception:
         redis_status = "disconnected"
-    
+
     return {
         "status": "healthy",
         "environment": settings.environment,
@@ -132,18 +139,32 @@ async def metrics_middleware(request: Request, call_next):
     try:
         auth_header = request.headers.get("x-api-key")
         if auth_header:
-            from src.api.middleware.auth import MOCK_API_KEYS
-            tier = MOCK_API_KEYS.get(auth_header, "free")
+            # Import here to avoid circular imports
+            from src.api.middleware.auth import AuthMiddleware
+
+            # Access the MOCK_API_KEYS from the AuthMiddleware class
+            # This is a temporary solution until we have proper database integration
+            if hasattr(AuthMiddleware, "MOCK_API_KEYS"):
+                tier = AuthMiddleware.MOCK_API_KEYS.get(auth_header, "free")
+            else:
+                # Fallback mock keys
+                MOCK_API_KEYS = {
+                    "sk-1234567890abcdef1234567890abcd": "free",
+                    "sk-abcdef1234567890abcdef123456": "basic",
+                    "sk-fedcba9876543210fedcba9876543210": "pro",
+                    "sk-11111111111111111111111111111111": "enterprise",
+                }
+                tier = MOCK_API_KEYS.get(auth_header, "free")
     except Exception:
         pass
-    
+
     start_time = time.time()
     response = await call_next(request)
     duration = time.time() - start_time
-    
+
     metrics.track_request_metrics(request, response.status_code, tier)
     metrics.track_latency(request, duration)
-    
+
     return response
 
 
