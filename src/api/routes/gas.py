@@ -5,7 +5,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from src.api.deps import CacheDep, TierDep
-from src.api.middleware.auth import get_api_key_tier
+
+# Removed unused import
 from src.core.logging import structlog
 from src.scoring.engine import ALLOWED_NETWORKS, validate_network
 from src.scoring.dimensions.cost import NETWORK_GAS
@@ -43,7 +44,7 @@ DEFAULT_GAS_GWEI: dict[str, float | None] = {
 @router.get("/", response_model=dict[str, GasResponse])
 async def list_gas_prices(cache: CacheDep) -> dict[str, GasResponse]:
     cached = await cache.get_gas_prices()
-    
+
     if cached:
         gas_data = cached
     else:
@@ -55,9 +56,9 @@ async def list_gas_prices(cache: CacheDep) -> dict[str, GasResponse]:
                 "gas_gwei": DEFAULT_GAS_GWEI.get(network),
             }
         await cache.set_gas_prices(gas_data)
-    
+
     timestamp = datetime.now(timezone.utc).isoformat()
-    
+
     result = {}
     for network, data in gas_data.items():
         result[network] = GasResponse(
@@ -66,7 +67,7 @@ async def list_gas_prices(cache: CacheDep) -> dict[str, GasResponse]:
             gas_gwei=data.get("gas_gwei"),
             updated_at=timestamp,
         )
-    
+
     return result
 
 
@@ -80,9 +81,9 @@ async def get_gas_price(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid network. Must be one of: {ALLOWED_NETWORKS}",
         )
-    
+
     cached = await cache.get_gas_prices()
-    
+
     if cached and network_id in cached:
         data = cached[network_id]
     else:
@@ -91,9 +92,9 @@ async def get_gas_price(
             "gas_usd": gas_info.get("gas_usd", 0.1),
             "gas_gwei": DEFAULT_GAS_GWEI.get(network_id),
         }
-    
+
     timestamp = datetime.now(timezone.utc).isoformat()
-    
+
     return GasResponse(
         network=network_id,
         gas_usd=data.get("gas_usd", 0.1),
@@ -112,18 +113,20 @@ async def get_gas_history(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid network. Must be one of: {ALLOWED_NETWORKS}",
         )
-    
+
     gas_info = NETWORK_GAS.get(network_id, {"gas_usd": 0.1, "avg_7d_usd": 0.1})
-    
+
     history = []
     base_gas = gas_info.get("gas_usd", 0.1)
-    
+
     for i in range(min(period_hours, 24)):
-        history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "gas_usd": base_gas * (1 + (i % 10) * 0.01),
-        })
-    
+        history.append(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "gas_usd": base_gas * (1 + (i % 10) * 0.01),
+            }
+        )
+
     return GasHistoryResponse(
         network=network_id,
         history=history,
@@ -162,36 +165,38 @@ async def predict_gas_price(
                 "upgrade_url": "/pricing",
             },
         )
-    
+
     if not validate_network(network_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid network. Must be one of: {ALLOWED_NETWORKS}",
         )
-    
+
     history_data = await cache.get_gas_history(network_id)
-    
+
     if not history_data or not history_data.get("history"):
         gas_info = NETWORK_GAS.get(network_id, {"gas_usd": 0.1})
         current_gas = gas_info.get("gas_usd", 0.1)
-        
+
         history = []
         for i in range(24, 0, -1):
             ts = datetime.now(timezone.utc) - timedelta(hours=i)
-            history.append({
-                "timestamp": ts.isoformat(),
-                "gas_usd": current_gas * (1 + (i % 10) * 0.01),
-            })
+            history.append(
+                {
+                    "timestamp": ts.isoformat(),
+                    "gas_usd": current_gas * (1 + (i % 10) * 0.01),
+                }
+            )
         await cache.set_gas_history(network_id, history)
         history_data = {"history": history}
-    
+
     history = history_data.get("history", [])
     gas_values = [h.get("gas_usd", 0) for h in history if "gas_usd" in h]
-    
+
     sma_6 = calculate_sma(gas_values, 6)
     sma_12 = calculate_sma(gas_values, 12)
     sma_24 = calculate_sma(gas_values, 24)
-    
+
     return GasPredictionResponse(
         network=network_id,
         prediction_1h=sma_6,
