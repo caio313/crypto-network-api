@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = structlog.get_logger()
 
-API_KEY_PATTERN = re.compile(r"^sk-[a-zA-Z0-9]{32,}$")
+API_KEY_PATTERN = re.compile(r"^sk-[a-zA-Z0-9-]{20,}$")
 
 MOCK_API_KEYS: dict[str, dict[str, str]] = {
     "sk-free-key-for-testing-1234567": {"tier": "free"},
@@ -26,6 +26,15 @@ def validate_api_key_format(api_key: str | None) -> bool:
 
 async def validate_api_key(api_key: str) -> dict[str, Any] | None:
     return MOCK_API_KEYS.get(api_key)
+
+
+def get_rate_limit_for_tier(tier: str) -> int:
+    limits = {
+        "free": 100,
+        "pro": 2000,
+        "enterprise": 0,
+    }
+    return limits.get(tier.lower(), 100)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -55,7 +64,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 content={"detail": "Invalid API key"},
             )
-
-        request.state.tier = key_data["tier"]
-        logger.info("api_key_validated", tier=key_data["tier"], key_prefix=api_key[:8])
+        # Support both dict-based key data and legacy/proxy string-based data.
+        if isinstance(key_data, dict) and "tier" in key_data:
+            tier = key_data["tier"]
+        elif isinstance(key_data, str):
+            tier = key_data
+        else:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid API key"},
+            )
+        request.state.tier = tier
+        logger.info("api_key_validated", tier=tier, key_prefix=api_key[:8])
         return await call_next(request)
