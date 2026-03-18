@@ -63,7 +63,8 @@ def run_migrations_online() -> None:
     from src.core.config import settings
 
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.database_url
+    sync_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+    configuration["sqlalchemy.url"] = sync_url
 
     connectable = engine_from_config(
         configuration,
