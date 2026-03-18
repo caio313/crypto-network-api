@@ -21,6 +21,7 @@ dependencies = [
     "prometheus-client>=0.24.1",
     "crypto-core",
     "alembic>=1.18.4",
+    "psycopg2-binary>=2.9.11",
 ]
 
 [project.optional-dependencies]
