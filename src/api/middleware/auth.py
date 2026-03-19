@@ -11,7 +11,7 @@ from src.models.db.api_keys import ApiKey
 
 logger = structlog.get_logger()
 
-API_KEY_PATTERN = re.compile(r"^sk-[a-zA-Z0-9-]{20,}$")
+API_KEY_PATTERN = re.compile(r"^sk-[a-zA-Z0-9_-]{20,}$")
 
 
 def validate_api_key_format(api_key: str | None) -> bool:
