@@ -5,17 +5,13 @@ import structlog
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy import select
+from src.db.session import AsyncSessionLocal
+from src.models.db.api_keys import ApiKey
 
 logger = structlog.get_logger()
 
 API_KEY_PATTERN = re.compile(r"^sk-[a-zA-Z0-9-]{20,}$")
-
-MOCK_API_KEYS: dict[str, dict[str, str]] = {
-    "sk-free-key-for-testing-1234567": {"tier": "free"},
-    "sk-pro-key-for-testing-12345678": {"tier": "pro"},
-    "sk-enterprise-key-test-123456789": {"tier": "enterprise"},
-    "sk-1234567890abcdef1234567890abcd": {"tier": "free"},
-}
 
 
 def validate_api_key_format(api_key: str | None) -> bool:
@@ -25,7 +21,14 @@ def validate_api_key_format(api_key: str | None) -> bool:
 
 
 async def validate_api_key(api_key: str) -> dict[str, Any] | None:
-    return MOCK_API_KEYS.get(api_key)
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(ApiKey).where(ApiKey.key == api_key, ApiKey.is_active == True)
+        )
+        key_obj = result.scalar_one_or_none()
+        if key_obj is None:
+            return None
+        return {"tier": key_obj.tier}
 
 
 def get_rate_limit_for_tier(tier: str) -> int:
@@ -38,7 +41,15 @@ def get_rate_limit_for_tier(tier: str) -> int:
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    EXEMPT_PATHS = {"/", "/docs", "/redoc", "/openapi.json", "/health", "/metrics"}
+    EXEMPT_PATHS = {
+        "/",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/health",
+        "/metrics",
+        "/v1/auth/register",
+    }
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         if request.url.path in self.EXEMPT_PATHS:
@@ -64,7 +75,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 content={"detail": "Invalid API key"},
             )
-        # Support both dict-based key data and legacy/proxy string-based data.
+
         if isinstance(key_data, dict) and "tier" in key_data:
             tier = key_data["tier"]
         elif isinstance(key_data, str):
@@ -74,6 +85,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 content={"detail": "Invalid API key"},
             )
+
         request.state.tier = tier
         logger.info("api_key_validated", tier=tier, key_prefix=api_key[:8])
         return await call_next(request)
