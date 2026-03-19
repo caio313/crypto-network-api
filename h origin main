@@ -1,0 +1,114 @@
+[1mdiff --git a/src/main.py b/src/main.py[m
+[1mindex 2afca04..75988de 100644[m
+[1m--- a/src/main.py[m
+[1m+++ b/src/main.py[m
+[36m@@ -8,7 +8,6 @@[m [mfrom fastapi.responses import JSONResponse[m
+ from pydantic import ValidationError[m
+ [m
+ from src.api.deps import get_redis_client[m
+[31m-from src.api.middleware.auth import get_api_key_tier[m
+ from src.api.middleware.rate_limit import RateLimitMiddleware[m
+ from src.api.middleware.auth import AuthMiddleware[m
+ from src.api.routes import alerts, gas, networks, transactions[m
+[36m@@ -24,23 +23,31 @@[m [m_beat_process: Any = None[m
+ [m
+ [m
+ @asynccontextmanager[m
+[31m-async def lifespan(app: FastAPI) -> Any:[m
+[32m+[m[32masync def lifespan(app: FastAPI):[m
+     global _beat_process[m
+[31m-    [m
+[32m+[m
+     logger.info("application_starting", environment=settings.environment)[m
+[31m-    [m
+[32m+[m
+     try:[m
+         await redis_client.connect()[m
+     except Exception as e:[m
+         logger.warning("redis_connection_failed", error=str(e))[m
+[31m-    [m
+[32m+[m
+     try:[m
+         import subprocess[m
+         import sys[m
+[31m-        [m
+[32m+[m
+         beat_proc = subprocess.Popen([m
+[31m-            [sys.executable, "-m", "celery", "-A", "src.ingestion.scheduler", "beat", [m
+[31m-             "--loglevel=info", "--pidfile=/tmp/celerybeat.pid"],[m
+[32m+[m[32m            [[m
+[32m+[m[32m                sys.executable,[m
+[32m+[m[32m                "-m",[m
+[32m+[m[32m                "celery",[m
+[32m+[m[32m                "-A",[m
+[32m+[m[32m                "src.ingestion.scheduler",[m
+[32m+[m[32m                "beat",[m
+[32m+[m[32m                "--loglevel=info",[m
+[32m+[m[32m                "--pidfile=/tmp/celerybeat.pid",[m
+[32m+[m[32m            ],[m
+             stdout=subprocess.DEVNULL,[m
+             stderr=subprocess.DEVNULL,[m
+         )[m
+[36m@@ -48,12 +55,12 @@[m [masync def lifespan(app: FastAPI) -> Any:[m
+         logger.info("celery_beat_started", pid=beat_proc.pid)[m
+     except Exception as e:[m
+         logger.warning("celery_beat_start_failed", error=str(e))[m
+[31m-    [m
+[32m+[m
+     yield[m
+[31m-    [m
+[32m+[m
+     logger.info("application_shutting_down")[m
+     await redis_client.disconnect()[m
+[31m-    [m
+[32m+[m
+     if _beat_process:[m
+         try:[m
+             _beat_process.terminate()[m
+[36m@@ -101,7 +108,7 @@[m [masync def health_check() -> dict[str, str]:[m
+             await redis_client.client.ping()[m
+     except Exception:[m
+         redis_status = "disconnected"[m
+[31m-    [m
+[32m+[m
+     return {[m
+         "status": "healthy",[m
+         "environment": settings.environment,[m
+[36m@@ -132,18 +139,32 @@[m [masync def metrics_middleware(request: Request, call_next):[m
+     try:[m
+         auth_header = request.headers.get("x-api-key")[m
+         if auth_header:[m
+[31m-            from src.api.middleware.auth import MOCK_API_KEYS[m
+[31m-            tier = MOCK_API_KEYS.get(auth_header, "free")[m
+[32m+[m[32m            # Import here to avoid circular imports[m
+[32m+[m[32m            from src.api.middleware.auth import AuthMiddleware[m
+[32m+[m
+[32m+[m[32m            # Access the MOCK_API_KEYS from the AuthMiddleware class[m
+[32m+[m[32m            # This is a temporary solution until we have proper database integration[m
+[32m+[m[32m            if hasattr(AuthMiddleware, "MOCK_API_KEYS"):[m
+[32m+[m[32m                tier = AuthMiddleware.MOCK_API_KEYS.get(auth_header, "free")[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                # Fallback mock keys[m
+[32m+[m[32m                MOCK_API_KEYS = {[m
+[32m+[m[32m                    "sk-1234567890abcdef1234567890abcd": "free",[m
+[32m+[m[32m                    "sk-abcdef1234567890abcdef123456": "basic",[m
+[32m+[m[32m                    "sk-fedcba9876543210fedcba9876543210": "pro",[m
+[32m+[m[32m                    "sk-11111111111111111111111111111111": "enterprise",[m
+[32m+[m[32m                }[m
+[32m+[m[32m                tier = MOCK_API_KEYS.get(auth_header, "free")[m
+     except Exception:[m
+         pass[m
+[31m-    [m
+[32m+[m
+     start_time = time.time()[m
+     response = await call_next(request)[m
+     duration = time.time() - start_time[m
+[31m-    [m
+[32m+[m
+     metrics.track_request_metrics(request, response.status_code, tier)[m
+     metrics.track_latency(request, duration)[m
+[31m-    [m
+[32m+[m
+     return response[m
+ [m
+ [m
