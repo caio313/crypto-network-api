@@ -11,6 +11,7 @@ from src.api.deps import get_redis_client
 from src.api.middleware.rate_limit import RateLimitMiddleware
 from src.api.middleware.auth import AuthMiddleware
 from src.api.routes import alerts, gas, networks, transactions
+from src.api import auth as auth_router
 from src.mcp import server as mcp_server
 from src.cache.redis import redis_client
 from src.core.config import settings
@@ -125,6 +126,7 @@ async def root() -> dict[str, str]:
     }
 
 
+app.include_router(auth_router.router)
 app.include_router(networks.router)
 app.include_router(gas.router)
 app.include_router(alerts.router)
